@@ -31,6 +31,8 @@ async function onSubmit(e) {
     // Clear fields
     emailInput.value = "";
     passwordInput.value = "";
+
+    window.location.href = "chat.html";
   } catch (err) {
     if (err.response.status === 404) {
       msg.classList.add("error");
