@@ -32,7 +32,7 @@ async function onSubmit(e) {
     emailInput.value = "";
     passwordInput.value = "";
     passwordInput.value = "";
-    // window.location.href = "login.html";
+    window.location.href = "login.html";
   } catch (err) {
     msg.classList.add("error");
     msg.textContent = "User Already exists";
