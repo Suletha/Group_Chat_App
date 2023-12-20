@@ -6,6 +6,10 @@ const addGroupBtn = document.getElementById("add-group");
 const addUserBtn = document.getElementById("add-user");
 const logoutbtn = document.getElementById("logoutbtn");
 const localStorageKey = "chatMessages";
+const socket = io("http://localhost:5000");
+socket.on("data", (data) => {
+  console.log(data);
+});
 
 let groupId = -1;
 
@@ -22,39 +26,9 @@ logoutbtn.addEventListener("click", logout);
 addGroupBtn.addEventListener("click", addGroup);
 addUserBtn.addEventListener("click", addUser);
 
-// Function to save a chat message in local storage
-function saveMessageToLocalStorage(message) {
-  let chatMessagesArray =
-    JSON.parse(localStorage.getItem(localStorageKey)) || [];
-
-  // Add the new message to the array
-  chatMessagesArray.push(message);
-
-  // Limit the array to the most recent 10 messages
-  if (chatMessagesArray.length > 10) {
-    chatMessagesArray.shift(); // Remove the oldest message
-  }
-
-  // Save the updated array back to local storage
-  localStorage.setItem(localStorageKey, JSON.stringify(chatMessagesArray));
-}
-
-// Function to retrieve messages from local storage and display them
-async function loadMessagesFromLocalStorage() {
-  const chatMessagesArray =
-    JSON.parse(localStorage.getItem(localStorageKey)) || [];
-
-  // Display the messages in the chat interface
-  chatMessages.innerHTML = "";
-  chatMessagesArray.forEach((message) => {
-    outputMessage(message);
-  });
-}
-
 async function fetchGroupList() {
-  
   try {
-    const groups = await axios.get("http://localhost:3000/groups/all");
+    const groups = await axios.get("http://localhost:4000/groups/all");
     //console.log("groups", groups.data);
     for (let i = 0; i < groups.data.length; i++) {
       outputGroups(groups.data[i]);
@@ -67,28 +41,6 @@ async function fetchGroupList() {
 // Load messages from local storage when the page is refreshed
 window.addEventListener("load", fetchGroupList);
 
-// Function to fetch messages from the server starting after the last message's ID
-async function fetchMessagesFromServer(lastMessageId) {
-  if (groupId !== -1) {
-    //console.log(lastMessageId);
-    try {
-      const response = await axios.get(
-        `http://localhost:3000/groups/${groupId}/msgs?lastMessageId=${
-          lastMessageId + 1
-        }`
-      );
-
-      const newMessages = response.data;
-      newMessages.forEach((message) => {
-        outputMessage(message);
-        saveMessageToLocalStorage(message);
-      });
-    } catch (err) {
-      console.log(err);
-    }
-  }
-}
-
 //message submit
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -97,20 +49,18 @@ chatForm.addEventListener("submit", async (e) => {
     //console.log(msg);
 
     const response = await axios.post(
-      `http://localhost:3000/groups/${groupId}/msgs`,
+      `http://localhost:4000/groups/${groupId}/msgs`,
       {
         msg: msg,
       }
     );
     //console.log(response.data);
-    outputMessage(response.data.msg);
-
-    // Save the message to local storage
-    saveMessageToLocalStorage(response.data.msg);
+    //outputMessage(response.data.msg);
 
     //clear input
     e.target.elements.msg.value = "";
     e.target.elements.msg.focus();
+    getMessages();
   } else {
     alert("Please select the group first");
   }
@@ -129,8 +79,7 @@ function outputMessage(message) {
 
 //Add users to dom
 function outputUsersFromGroup(userData) {
-  //console.log("userdata", userData);
-  console.log(userData);
+  //console.log(userData);
   const user = document.createElement("li");
   if (userData.UserGroups[0].isadmin === true) {
     user.innerHTML = `<li id='${userData.id}'>${userData.name} (Admin)</li><i class="fas fa-minus" id="${userData.id}"></i>`;
@@ -139,7 +88,7 @@ function outputUsersFromGroup(userData) {
   }
   var iElement = user.getElementsByTagName("i");
   var liElement = user.getElementsByTagName("li");
-  console.log(iElement[0]);
+  //console.log(iElement[0]);
   iElement[0].addEventListener("click", removeUser);
   liElement[0].addEventListener("click", makeadmin);
   userList.appendChild(user);
@@ -147,7 +96,6 @@ function outputUsersFromGroup(userData) {
 
 // after adding user to group
 function outputUsers(userData) {
-  //console.log("userdata", userData);
   console.log(userData);
   const user = document.createElement("li");
   user.innerHTML = `<li id='${userData.id}'>${userData.name}</li><i class="fas fa-minus" id="${userData.id}"></i>`;
@@ -161,30 +109,28 @@ function outputUsers(userData) {
 
 function outputGroups(groupData) {
   const group = document.createElement("li");
-  if (groupData.UserGroups && groupData.UserGroups.length > 0 && groupData.UserGroups[0].groupId) {
-    group.innerHTML = `<li id='${groupData.UserGroups[0].groupId}'>${groupData.name}</li>`;
-    group.addEventListener("click", loadUserForGroup);
-  } else {
-    group.innerHTML = `<li>${groupData.name}</li>`;
-  // You might want to handle this case differently or not add an event listener
-  }
+  group.innerHTML = `<li id='${groupData.UserGroups[0].groupId}'>${groupData.name}</li>`;
+  group.addEventListener("click", loadUserForGroup);
   groupList.appendChild(group);
-}  
+}
 
+function outputGroup(groupData) {
+  const group = document.createElement("li");
+  group.innerHTML = `<li id='${groupData.id}'>${groupData.name}</li>`;
+  group.addEventListener("click", loadUserForGroup);
+  groupList.appendChild(group);
+}
 
 // add group
 async function addGroup() {
   const groupname = prompt("Please enter the name of group:");
   if (groupname !== null) {
-    // User clicked "OK" and provided input
-    //console.log("group name:", groupname);
-    const newGroup = await axios.post(`http://localhost:3000/groups/addgroup`, {
+    const newGroup = await axios.post(`http://localhost:4000/groups/addgroup`, {
       groupname: groupname,
     });
-    //console.log(newGroup.data);
-    outputGroups(newGroup.data);
+    console.log(newGroup.data);
+    outputGroup(newGroup.data);
   } else {
-    // User clicked "Cancel" or closed the dialog
     console.log("User canceled the input");
   }
 }
@@ -196,7 +142,7 @@ async function addUser() {
     if (userEmail !== null) {
       try {
         const newUser = await axios.post(
-          `http://localhost:3000/groups/${groupId}/user`,
+          `http://localhost:4000/groups/${groupId}/user`,
           {
             userEmail: userEmail,
           }
@@ -207,7 +153,6 @@ async function addUser() {
         alert("user does not exists");
       }
     } else {
-      // User clicked "Cancel" or closed the dialog
       console.log("User canceled the input");
     }
   } else {
@@ -225,25 +170,15 @@ const loadUserForGroup = async (e) => {
   e.target.classList.add("selected");
   try {
     const users = await axios.get(
-      `http://localhost:3000/groups/${groupId}/users`
+      `http://localhost:4000/groups/${groupId}/users`
     );
     for (let i = 0; i < users.data.length; i++)
       outputUsersFromGroup(users.data[i]);
   } catch (err) {
     console.log(err);
   }
+  getMessages();
 };
-
-// Periodically fetch new messages from the server (e.g., every 1 seconds)
-setInterval(() => {
-  const chatMessagesArray =
-    JSON.parse(localStorage.getItem(localStorageKey)) || [];
-  const lastMessage = chatMessagesArray[chatMessagesArray.length - 1];
-
-  // Use the last message's ID to fetch new messages from the server
-  const lastMessageId = lastMessage ? lastMessage.id : -1;
-  fetchMessagesFromServer(lastMessageId);
-}, 1000);
 
 //logout function
 function logout() {
@@ -258,7 +193,7 @@ async function removeUser(e) {
   if (confirmation) {
     try {
       const result = await axios.delete(
-        `http://localhost:3000/groups/${groupId}/user`,
+        `http://localhost:4000/groups/${groupId}/user`,
         {
           params: {
             userId: e.target.id,
@@ -272,7 +207,6 @@ async function removeUser(e) {
       } else if (err.response && err.response.status === 405) {
         alert("You are not an admin");
       } else {
-        // Handle other errors here, e.g., network issues
         console.error("An error occurred:", err);
       }
     }
@@ -284,7 +218,7 @@ async function makeadmin(e) {
   if (confirmation) {
     try {
       const result = await axios.patch(
-        `http://localhost:3000/groups/${groupId}/makeadmin`,
+        `http://localhost:4000/groups/${groupId}/makeadmin`,
         {
           userId: e.target.id,
         }
@@ -300,9 +234,20 @@ async function makeadmin(e) {
       } else if (err.response && err.response.status === 405) {
         alert("You are not an admin");
       } else {
-        // Handle other errors here, e.g., network issues
         console.error("An error occurred:", err);
       }
     }
+  }
+}
+
+async function getMessages() {
+  if (groupId !== -1) {
+    socket.emit("getMessages", groupId);
+    socket.on("messages", (messages) => {
+      chatMessages.innerHTML = "";
+      messages.forEach((message) => {
+        outputMessage(message);
+      });
+    });
   }
 }

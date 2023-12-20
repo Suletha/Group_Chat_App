@@ -19,12 +19,6 @@ body {
   font-size: 16px;
   background: var(--light-color);
   margin: 20px;
-
-  background-image: url(images/img2.jpg);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-size: 100% 100%;
-
 }
 
 ul {
